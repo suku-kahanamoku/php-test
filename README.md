@@ -71,20 +71,47 @@ Frontend komunikuje výhradně přes `fetch()` na REST endpointy – žádné `?
 
 ### Produkty
 
-| Metoda | Endpoint         | Auth       | Popis                           |
-|--------|------------------|------------|---------------------------------|
-| GET    | `/products`      | –          | Seznam, q={}, sort, page, limit |
-| GET    | `/products/{id}` | –          | Jeden produkt                   |
-| POST   | `/products`      | user/admin | Vytvořit (validuje cenu)        |
-| PUT    | `/products/{id}` | user/admin | Upravit                         |
-| DELETE | `/products/{id}` | **admin**  | Smazat                          |
+| Metoda | Endpoint         | Auth       | Popis                                     |
+|--------|------------------|------------|-------------------------------------------|
+| GET    | `/products`      | –          | Seznam, q={}, sort, page, limit           |
+| GET    | `/products/{id}` | –          | Jeden produkt                             |
+| POST   | `/products`      | user/admin | Vytvořit (plná validace polí)             |
+| PUT    | `/products/{id}` | user/admin | Upravit (plná validace polí)              |
+| DELETE | `/products/{id}` | **admin**  | Smazat                                    |
+
+#### Product fields & validation rules
+
+| Field            | Type    | Required | Rules                                                              |
+|------------------|---------|----------|--------------------------------------------------------------------|
+| `name`           | string  | POST ✓   | min 2, max 200 characters                                         |
+| `sku`            | string  | –        | max 50 chars, only `A-Za-z0-9-_`, must be unique                  |
+| `price`          | float   | POST ✓   | numeric, dot as decimal separator, ≥ 0                            |
+| `category`       | enum    | –        | `electronics`, `gadgets`, `home`, `office`, `garden`, `sports`, `other` |
+| `status`         | enum    | –        | `active`, `inactive`, `discontinued`                              |
+| `stock_quantity` | integer | –        | whole number (no float), ≥ 0                                      |
+| `color`          | enum    | –        | `red`, `blue`, `green`, `black`, `white`, `gray`, `brown`, `gold`, `silver` |
+| `unit`           | enum    | –        | `ks`, `m`, `kg`, `l`                                              |
+| `weight`         | float   | –        | numeric, dot as decimal separator, ≥ 0                            |
+| `description`    | string  | –        | max 1000 characters                                               |
+| `created_at`     | date    | –        | format `YYYY-MM-DD`                                               |
 
 ### Enumerace
 
-| Metoda | Endpoint         | Auth | Popis                  |
-|--------|------------------|------|------------------------|
-| GET    | `/enums`         | –    | Všechny číselníky      |
-| GET    | `/enums/{type}`  | –    | Konkrétní číselník     |
+| Metoda | Endpoint                  | Auth      | Popis                              |
+|--------|---------------------------|-----------|------------------------------------|
+| GET    | `/enums`                  | –         | Všechny číselníky                  |
+| GET    | `/enums/{type}`           | –         | Konkrétní číselník                 |
+| POST   | `/enums/{type}`           | **admin** | Přidat novou hodnotu do číselníku  |
+| PUT    | `/enums/{type}/{value}`   | **admin** | Upravit label existující hodnoty   |
+
+Available enum types: `categories`, `statuses`, `colors`, `units`, `roles`
+
+#### Enum POST/PUT fields & validation rules
+
+| Field   | Type   | Required | Rules                                                              |
+|---------|--------|----------|--------------------------------------------------------------------|
+| `value` | string | POST ✓   | lowercase, only `a-z0-9_-`, max 50 chars, must be unique in type  |
+| `label` | string | ✓        | non-empty, max 100 characters                                      |
 
 ### Uživatelé
 
@@ -525,6 +552,324 @@ git show HEAD:data/products.json | python3 -m json.tool | grep '"price"'
 ```
 
 **Úkol:** Vytvoř branch `bugfix/price-types`, oprav data v `products.json` (změň `10` na `10.2`, `"19,90"` na `19.90`, `"8,50"` na `8.50`) a commitni s popisnou commit message.
+
+---
+
+### Scénář 11 – Validace povinných polí (Products POST)
+
+**Cíl:** Ověřit, že API vrátí HTTP 422 a strukturu `errors` při chybějících povinných polích.
+
+**Postup:**
+
+1. Odešli POST bez žádného těla:
+```bash
+curl -X POST https://diamondfish.cz/php-test/api/products \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{}'
+```
+**Očekáváno:** `422 Unprocessable Entity`, `errors.name = "Field "name" is required."`, `errors.price = "Field "price" is required."`
+
+2. Odešli POST jen s `name`, bez `price`:
+```bash
+curl -X POST https://diamondfish.cz/php-test/api/products \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test"}'
+```
+**Očekáváno:** `422`, `errors.price = "Field "price" is required."`
+
+3. Odešli POST s jednoznakovým názvem (`"name": "X"`):
+**Očekáváno:** `422`, `errors.name = "Field "name" must be at least 2 characters long."`
+
+4. Odešli POST bez autorizace (vynech hlavičku Authorization):
+**Očekáváno:** `401 Unauthorized`
+
+---
+
+### Scénář 12 – Validace datových typů (Products POST/PUT)
+
+**Cíl:** Ověřit, že API odmítne nesprávné datové typy a vrátí srozumitelné chybové hlášky.
+
+**Postup – price:**
+
+```bash
+BASE="https://diamondfish.cz/php-test/api"
+
+# Decimal comma (string s čárkou)
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":"25,50"}'
+# → 422, errors.price: "Field "price" uses a decimal comma instead of a dot."
+
+# Textový řetězec místo čísla
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":"expensive"}'
+# → 422, errors.price: "Field "price" must be a valid numeric value..."
+
+# Záporná cena
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":-5}'
+# → 422, errors.price: "Field "price" must be 0 or greater."
+```
+
+**Postup – stock_quantity (musí být celé číslo):**
+
+```bash
+# Float místo integeru
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"stock_quantity":5.3}'
+# → 422, errors.stock_quantity: "Field "stock_quantity" must be an integer, not a float..."
+
+# Záporná hodnota
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"stock_quantity":-1}'
+# → 422, errors.stock_quantity: "Field "stock_quantity" must be 0 or greater."
+
+# Textový řetězec
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"stock_quantity":"many"}'
+# → 422, errors.stock_quantity: "Field "stock_quantity" must be a whole integer number..."
+```
+
+**Postup – weight:**
+
+```bash
+# Textová hodnota
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"weight":"heavy"}'
+# → 422, errors.weight: "Field "weight" must be a valid numeric value..."
+
+# Decimal comma
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"weight":"1,5"}'
+# → 422, errors.weight: "Field "weight" uses a decimal comma instead of a dot."
+```
+
+---
+
+### Scénář 13 – Validace enum hodnot (Products POST/PUT)
+
+**Cíl:** Ověřit, že API odmítne hodnoty mimo povolené enum množiny.
+
+```bash
+BASE="https://diamondfish.cz/php-test/api"
+
+# Neplatná kategorie
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"category":"furniture"}'
+# → 422, errors.category: "Field "category" must be one of: electronics, gadgets, home, office, garden, sports, other."
+
+# Neplatný status
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"status":"pending"}'
+# → 422, errors.status: "Field "status" must be one of: active, inactive, discontinued."
+
+# Neplatná barva
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"color":"pink"}'
+# → 422, errors.color: "Field "color" must be one of: red, blue, green, black, white, gray, brown, gold, silver."
+
+# Neplatná jednotka
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"unit":"pcs"}'
+# → 422, errors.unit: "Field "unit" must be one of: ks, m, kg, l."
+
+# PUT update – neplatný status na existujícím produktu
+curl -X PUT "$BASE/products/1" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"status":"unknown"}'
+# → 422, errors.status: "Field "status" must be one of: active, inactive, discontinued."
+```
+
+**Platný request pro srovnání:**
+```bash
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"New Widget","price":29.99,"category":"gadgets","status":"active","stock_quantity":10,"color":"blue","unit":"ks"}'
+# → 201 Created
+```
+
+---
+
+### Scénář 14 – Validace SKU (Products POST/PUT)
+
+**Cíl:** Ověřit unikátnost a formát pole `sku`.
+
+```bash
+BASE="https://diamondfish.cz/php-test/api"
+
+# Neplatný formát (mezery, speciální znaky)
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"sku":"WDG 001!"}'
+# → 422, errors.sku: "Field "sku" may only contain letters, digits, hyphens and underscores."
+
+# SKU již existuje (WDG-001 je použité)
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Duplicate","price":10,"sku":"WDG-001"}'
+# → 422, errors.sku: "Field "sku" must be unique. Value "WDG-001" is already taken."
+
+# Příliš dlouhé SKU (> 50 znaků)
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Test","price":10,"sku":"AAAAAAAAAA-BBBBBBBBBB-CCCCCCCCCC-DDDDDDDDDD-EEEEEEEEEE-FF"}'
+# → 422, errors.sku: "Field "sku" must not exceed 50 characters."
+```
+
+---
+
+### Scénář 15 – Validace Enum endpoints (POST/PUT)
+
+**Cíl:** Ověřit vytváření a úpravy enum hodnot s validací.
+
+> Vyžaduje roli **admin**. Použij `admin-token-xyz456`.
+
+```bash
+BASE="https://diamondfish.cz/php-test/api"
+
+# GET – načti dostupné kategorie
+curl "$BASE/enums/categories"
+
+# POST – přidej novou kategorii
+curl -X POST "$BASE/enums/categories" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer admin-token-xyz456" \
+     -d '{"value":"automotive","label":"Automotive"}'
+# → 201 Created
+
+# Ověř, že hodnota přibyla
+curl "$BASE/enums/categories"
+
+# POST – pokus o duplikát
+curl -X POST "$BASE/enums/categories" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer admin-token-xyz456" \
+     -d '{"value":"electronics","label":"Elektronika"}'
+# → 422, errors.value: "Field "value" must be unique..."
+
+# POST – neplatný formát value (velká písmena, mezery)
+curl -X POST "$BASE/enums/categories" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer admin-token-xyz456" \
+     -d '{"value":"New Category","label":"Nová kategorie"}'
+# → 422, errors.value: "Field "value" must be lowercase and may only contain letters (a-z), digits, underscores and hyphens."
+
+# POST – chybí label
+curl -X POST "$BASE/enums/categories" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer admin-token-xyz456" \
+     -d '{"value":"mycat"}'
+# → 422, errors.label: "Field "label" is required."
+
+# POST – neexistující typ
+curl -X POST "$BASE/enums/sizes" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer admin-token-xyz456" \
+     -d '{"value":"xl","label":"Extra Large"}'
+# → 404 Not Found
+
+# PUT – uprav label existující hodnoty
+curl -X PUT "$BASE/enums/categories/electronics" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer admin-token-xyz456" \
+     -d '{"label":"Electronics & Tech"}'
+# → 200 OK
+
+# PUT – pokus s user tokenem (nedostatečná oprávnění)
+curl -X PUT "$BASE/enums/categories/electronics" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"label":"Hack"}'
+# → 403 Forbidden
+
+# PUT – neexistující hodnota
+curl -X PUT "$BASE/enums/categories/nonexistent" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer admin-token-xyz456" \
+     -d '{"label":"Test"}'
+# → 404 Not Found
+```
+
+---
+
+### Scénář 16 – Více chyb najednou (Multiple validation errors)
+
+**Cíl:** Ověřit, že API vrátí všechny chyby v jedné odpovědi (ne jen první).
+
+```bash
+curl -X POST https://diamondfish.cz/php-test/api/products \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{
+       "name": "X",
+       "price": "drahý",
+       "category": "furniture",
+       "status": "pending",
+       "stock_quantity": 5.5,
+       "color": "pink",
+       "unit": "pcs",
+       "weight": "těžký",
+       "sku": "bad sku!",
+       "created_at": "15-01-2024"
+     }'
+```
+
+**Očekávaná odpověď:**
+```json
+{
+  "success": false,
+  "message": "Validation failed.",
+  "errors": {
+    "name": "Field \"name\" must be at least 2 characters long.",
+    "sku": "Field \"sku\" may only contain letters, digits, hyphens and underscores...",
+    "price": "Field \"price\" must be a valid numeric value...",
+    "category": "Field \"category\" must be one of: electronics, gadgets, home, office, garden, sports, other...",
+    "status": "Field \"status\" must be one of: active, inactive, discontinued...",
+    "stock_quantity": "Field \"stock_quantity\" must be an integer, not a float...",
+    "color": "Field \"color\" must be one of: red, blue, green...",
+    "unit": "Field \"unit\" must be one of: ks, m, kg, l...",
+    "weight": "Field \"weight\" must be a valid numeric value...",
+    "created_at": "Field \"created_at\" must be a valid date in format YYYY-MM-DD..."
+  }
+}
+```
+
+**Co ověřit:**
+- HTTP status je `422`
+- `success` je `false`
+- Objekt `errors` obsahuje klíče odpovídající problematickým polím
+- Chybové hlášky jsou v anglickém jazyce
+- Všechny chyby jsou vráceny najednou, ne postupně
 
 ---
 

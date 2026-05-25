@@ -53,6 +53,143 @@ function nextId(array $data): int
     return empty($data) ? 1 : (int) max(array_column($data, 'id')) + 1;
 }
 
+// ─── Validators ───────────────────────────────────────────────────────────────
+
+function validateProduct(Request $req, bool $isCreate = true): array
+{
+    $errors = [];
+
+    // name
+    $name = trim((string) $req->get('name', ''));
+    if ($isCreate && $name === '') {
+        $errors['name'] = 'Field "name" is required.';
+    } elseif ($name !== '' && strlen($name) < 2) {
+        $errors['name'] = 'Field "name" must be at least 2 characters long.';
+    } elseif (strlen($name) > 200) {
+        $errors['name'] = 'Field "name" must not exceed 200 characters.';
+    }
+
+    // sku
+    $sku = $req->get('sku');
+    if ($sku !== null && $sku !== '') {
+        if (strlen((string) $sku) > 50) {
+            $errors['sku'] = 'Field "sku" must not exceed 50 characters.';
+        } elseif (!preg_match('/^[A-Za-z0-9\-_]+$/', (string) $sku)) {
+            $errors['sku'] = 'Field "sku" may only contain letters, digits, hyphens and underscores (e.g. "WDG-001").';
+        }
+    }
+
+    // price
+    $price = $req->get('price');
+    if ($isCreate && ($price === null || $price === '')) {
+        $errors['price'] = 'Field "price" is required.';
+    } elseif ($price !== null && $price !== '') {
+        if (is_string($price) && str_contains($price, ',')) {
+            $errors['price'] = 'Field "price" uses a decimal comma instead of a dot. Use format "10.5".';
+        } elseif (!is_numeric($price)) {
+            $errors['price'] = 'Field "price" must be a valid numeric value (integer or float), got: "' . $price . '".';
+        } elseif ((float) $price < 0) {
+            $errors['price'] = 'Field "price" must be 0 or greater.';
+        }
+    }
+
+    // category
+    $validCategories = ['electronics', 'gadgets', 'home', 'office', 'garden', 'sports', 'other'];
+    $category        = $req->get('category');
+    if ($category !== null && $category !== '' && !in_array($category, $validCategories, true)) {
+        $errors['category'] = 'Field "category" must be one of: ' . implode(', ', $validCategories) . '. Got: "' . $category . '".';
+    }
+
+    // status
+    $validStatuses = ['active', 'inactive', 'discontinued'];
+    $status        = $req->get('status');
+    if ($status !== null && $status !== '' && !in_array($status, $validStatuses, true)) {
+        $errors['status'] = 'Field "status" must be one of: ' . implode(', ', $validStatuses) . '. Got: "' . $status . '".';
+    }
+
+    // stock_quantity
+    $stock = $req->get('stock_quantity');
+    if ($stock !== null && $stock !== '') {
+        if (!is_numeric($stock)) {
+            $errors['stock_quantity'] = 'Field "stock_quantity" must be a whole integer number, got: "' . $stock . '".';
+        } elseif (floor((float) $stock) !== (float) $stock) {
+            $errors['stock_quantity'] = 'Field "stock_quantity" must be an integer, not a float (e.g. 5, not 5.3). Got: ' . $stock . '.';
+        } elseif ((int) $stock < 0) {
+            $errors['stock_quantity'] = 'Field "stock_quantity" must be 0 or greater.';
+        }
+    }
+
+    // color
+    $validColors = ['red', 'blue', 'green', 'black', 'white', 'gray', 'brown', 'gold', 'silver'];
+    $color       = $req->get('color');
+    if ($color !== null && $color !== '' && !in_array($color, $validColors, true)) {
+        $errors['color'] = 'Field "color" must be one of: ' . implode(', ', $validColors) . '. Got: "' . $color . '".';
+    }
+
+    // unit
+    $validUnits = ['ks', 'm', 'kg', 'l'];
+    $unit       = $req->get('unit');
+    if ($unit !== null && $unit !== '' && !in_array($unit, $validUnits, true)) {
+        $errors['unit'] = 'Field "unit" must be one of: ' . implode(', ', $validUnits) . '. Got: "' . $unit . '".';
+    }
+
+    // weight
+    $weight = $req->get('weight');
+    if ($weight !== null && $weight !== '') {
+        if (is_string($weight) && str_contains($weight, ',')) {
+            $errors['weight'] = 'Field "weight" uses a decimal comma instead of a dot. Use format "1.5".';
+        } elseif (!is_numeric($weight)) {
+            $errors['weight'] = 'Field "weight" must be a valid numeric value (float), got: "' . $weight . '".';
+        } elseif ((float) $weight < 0) {
+            $errors['weight'] = 'Field "weight" must be 0 or greater.';
+        }
+    }
+
+    // description
+    $description = $req->get('description');
+    if ($description !== null && strlen((string) $description) > 1000) {
+        $errors['description'] = 'Field "description" must not exceed 1000 characters (got ' . strlen((string) $description) . ').';
+    }
+
+    // created_at
+    $createdAt = $req->get('created_at');
+    if ($createdAt !== null && $createdAt !== '') {
+        $dt = \DateTime::createFromFormat('Y-m-d', (string) $createdAt);
+        if (!$dt || $dt->format('Y-m-d') !== (string) $createdAt) {
+            $errors['created_at'] = 'Field "created_at" must be a valid date in format YYYY-MM-DD, got: "' . $createdAt . '".';
+        }
+    }
+
+    return $errors;
+}
+
+function validateEnumItem(Request $req, bool $requireValue = true): array
+{
+    $errors = [];
+
+    // value (required on create only)
+    $value = trim((string) $req->get('value', ''));
+    if ($requireValue) {
+        if ($value === '') {
+            $errors['value'] = 'Field "value" is required.';
+        } elseif (!preg_match('/^[a-z0-9_\-]+$/', $value)) {
+            $errors['value'] = 'Field "value" must be lowercase and may only contain letters (a-z), digits, underscores and hyphens.';
+        } elseif (strlen($value) > 50) {
+            $errors['value'] = 'Field "value" must not exceed 50 characters.';
+        }
+    }
+
+    // label
+    $label = trim((string) $req->get('label', ''));
+    if ($label === '') {
+        $errors['label'] = 'Field "label" is required.';
+    } elseif (strlen($label) > 100) {
+        $errors['label'] = 'Field "label" must not exceed 100 characters.';
+    }
+
+    return $errors;
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 $request = new Request();
@@ -96,29 +233,27 @@ $router->get('/products/{id}', function (Request $req, array $params) {
 $router->post('/products', function (Request $req) {
     requireAuth($req);
 
-    $name  = trim((string) $req->get('name', ''));
-    $price = $req->get('price');
-
-    if ($name === '') {
-        Response::error('Pole name je povinné.', 422);
-    }
-    if ($price === null || $price === '') {
-        Response::error('Pole price je povinné.', 422);
-    }
-    // Odmitni desetinnou carku
-    if (is_string($price) && str_contains($price, ',')) {
-        Response::error('Pole price obsahuje desetinnou čárku místo tečky. Použijte formát "10.5".', 422, ['field' => 'price', 'value' => $price]);
-    }
-    if (!is_numeric($price)) {
-        Response::error('Pole price musí být číslo.', 422, ['field' => 'price', 'value' => $price]);
+    $errors = validateProduct($req, true);
+    if (!empty($errors)) {
+        Response::error('Validation failed.', 422, $errors);
     }
 
-    $all    = loadJson('products.json');
+    // sku uniqueness check
+    $all = loadJson('products.json');
+    $sku = trim((string) $req->get('sku', ''));
+    if ($sku !== '') {
+        foreach ($all as $p) {
+            if (isset($p['sku']) && $p['sku'] === $sku) {
+                Response::error('Validation failed.', 422, ['sku' => 'Field "sku" must be unique. Value "' . $sku . '" is already taken.']);
+            }
+        }
+    }
+
     $product = [
         'id'             => nextId($all),
-        'name'           => $name,
-        'sku'            => (string) $req->get('sku', ''),
-        'price'          => (float) $price,
+        'name'           => trim((string) $req->get('name', '')),
+        'sku'            => $sku,
+        'price'          => (float) $req->get('price'),
         'category'       => (string) $req->get('category', 'other'),
         'status'         => (string) $req->get('status', 'active'),
         'stock_quantity' => (int)    $req->get('stock_quantity', 0),
@@ -126,7 +261,7 @@ $router->post('/products', function (Request $req) {
         'color'          => (string) $req->get('color', ''),
         'unit'           => (string) $req->get('unit', 'ks'),
         'weight'         => (float)  $req->get('weight', 0),
-        'created_at'     => date('Y-m-d'),
+        'created_at'     => $req->get('created_at') ?? date('Y-m-d'),
     ];
 
     $all[] = $product;
@@ -148,21 +283,25 @@ $router->put('/products/{id}', function (Request $req, array $params) {
         }
     }
     if ($index === null) {
-        Response::notFound("Produkt s ID {$id} nebyl nalezen.");
+        Response::notFound("Product with ID {$id} not found.");
     }
 
-    $price = $req->get('price');
-    if ($price !== null) {
-        if (is_string($price) && str_contains($price, ',')) {
-            Response::error('Pole price obsahuje desetinnou čárku místo tečky.', 422, ['field' => 'price', 'value' => $price]);
-        }
-        if (!is_numeric($price)) {
-            Response::error('Pole price musí být číslo.', 422);
-        }
-        $all[$index]['price'] = (float) $price;
+    $errors = validateProduct($req, false);
+    if (!empty($errors)) {
+        Response::error('Validation failed.', 422, $errors);
     }
 
-    $fields = ['name', 'sku', 'category', 'status', 'stock_quantity', 'description', 'color', 'unit', 'weight'];
+    // sku uniqueness check (skip current product)
+    $sku = $req->get('sku');
+    if ($sku !== null && $sku !== '') {
+        foreach ($all as $i => $p) {
+            if ($i !== $index && isset($p['sku']) && $p['sku'] === (string) $sku) {
+                Response::error('Validation failed.', 422, ['sku' => 'Field "sku" must be unique. Value "' . $sku . '" is already taken.']);
+            }
+        }
+    }
+
+    $fields = ['name', 'sku', 'category', 'status', 'description', 'color', 'unit', 'created_at'];
     foreach ($fields as $field) {
         $val = $req->get($field);
         if ($val !== null) {
@@ -170,8 +309,23 @@ $router->put('/products/{id}', function (Request $req, array $params) {
         }
     }
 
+    $price = $req->get('price');
+    if ($price !== null) {
+        $all[$index]['price'] = (float) $price;
+    }
+
+    $stock = $req->get('stock_quantity');
+    if ($stock !== null) {
+        $all[$index]['stock_quantity'] = (int) $stock;
+    }
+
+    $weight = $req->get('weight');
+    if ($weight !== null) {
+        $all[$index]['weight'] = (float) $weight;
+    }
+
     saveJson('products.json', $all);
-    Response::success($all[$index], 'Produkt aktualizován.');
+    Response::success($all[$index], 'Product updated successfully.');
 });
 
 $router->delete('/products/{id}', function (Request $req, array $params) {
@@ -222,6 +376,70 @@ $router->get('/enums/{type}', function (Request $req, array $params) {
     $paged    = Filter::paginate($items, $page, $limit);
 
     Response::successList($paged['items'], $paged['total'], $page, $limit);
+});
+
+$router->post('/enums/{type}', function (Request $req, array $params) {
+    requireAdmin($req);
+
+    $validTypes = ['categories', 'statuses', 'colors', 'units', 'roles'];
+    $type       = $params['type'];
+    if (!in_array($type, $validTypes, true)) {
+        Response::notFound('Enum type "' . $type . '" does not exist. Available: ' . implode(', ', $validTypes) . '.');
+    }
+
+    $errors = validateEnumItem($req, true);
+    if (!empty($errors)) {
+        Response::error('Validation failed.', 422, $errors);
+    }
+
+    $value = trim((string) $req->get('value', ''));
+    $label = trim((string) $req->get('label', ''));
+
+    $all = loadJson('enums.json');
+    foreach ($all[$type] as $item) {
+        if ($item['value'] === $value) {
+            Response::error('Validation failed.', 422, ['value' => 'Field "value" must be unique within type "' . $type . '". Value "' . $value . '" already exists.']);
+        }
+    }
+
+    $newItem    = ['value' => $value, 'label' => $label];
+    $all[$type][] = $newItem;
+    saveJson('enums.json', $all);
+    Response::created($newItem);
+});
+
+$router->put('/enums/{type}/{value}', function (Request $req, array $params) {
+    requireAdmin($req);
+
+    $validTypes = ['categories', 'statuses', 'colors', 'units', 'roles'];
+    $type       = $params['type'];
+    if (!in_array($type, $validTypes, true)) {
+        Response::notFound('Enum type "' . $type . '" does not exist. Available: ' . implode(', ', $validTypes) . '.');
+    }
+
+    $value = $params['value'];
+    $all   = loadJson('enums.json');
+    $index = null;
+
+    foreach ($all[$type] as $i => $item) {
+        if ($item['value'] === $value) {
+            $index = $i;
+            break;
+        }
+    }
+    if ($index === null) {
+        Response::notFound('Enum value "' . $value . '" not found in type "' . $type . '".');
+    }
+
+    $errors = validateEnumItem($req, false);
+    if (!empty($errors)) {
+        Response::error('Validation failed.', 422, $errors);
+    }
+
+    $label                     = trim((string) $req->get('label', ''));
+    $all[$type][$index]['label'] = $label;
+    saveJson('enums.json', $all);
+    Response::success($all[$type][$index], 'Enum item updated successfully.');
 });
 
 // ── USERS ─────────────────────────────────────────────────────────────────────
