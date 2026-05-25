@@ -119,9 +119,9 @@ Frontend komunikuje výhradně přes `fetch()` na REST endpointy – žádné `?
 ### Přihlášení (Bearer token)
 
 ```bash
-curl -X POST http://localhost:8000/api/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"email":"jan.novak@test.cz","password":"heslo123"}'
+curl -X POST http://localhost:8765/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jan.novak@test.cz","password":"heslo123"}'
 ```
 
 Odpověď:
