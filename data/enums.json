@@ -1,0 +1,38 @@
+{
+  "categories": [
+    {"value": "electronics", "label": "Elektronika"},
+    {"value": "gadgets",     "label": "Gadgety"},
+    {"value": "home",        "label": "Domácnost"},
+    {"value": "office",      "label": "Kancelář"},
+    {"value": "garden",      "label": "Zahrada"},
+    {"value": "sports",      "label": "Sport"},
+    {"value": "other",       "label": "Ostatní"}
+  ],
+  "statuses": [
+    {"value": "active",       "label": "Aktivní"},
+    {"value": "inactive",     "label": "Neaktivní"},
+    {"value": "discontinued", "label": "Ukončeno"}
+  ],
+  "colors": [
+    {"value": "red",    "label": "Červená"},
+    {"value": "blue",   "label": "Modrá"},
+    {"value": "green",  "label": "Zelená"},
+    {"value": "black",  "label": "Černá"},
+    {"value": "white",  "label": "Bílá"},
+    {"value": "gray",   "label": "Šedá"},
+    {"value": "brown",  "label": "Hnědá"},
+    {"value": "gold",   "label": "Zlatá"},
+    {"value": "silver", "label": "Stříbrná"}
+  ],
+  "units": [
+    {"value": "ks", "label": "Kus"},
+    {"value": "m",  "label": "Metr"},
+    {"value": "kg", "label": "Kilogram"},
+    {"value": "l",  "label": "Litr"}
+  ],
+  "roles": [
+    {"value": "admin",  "label": "Administrátor"},
+    {"value": "user",   "label": "Uživatel"},
+    {"value": "editor", "label": "Editor"}
+  ]
+}
