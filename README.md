@@ -14,7 +14,7 @@ cd /cesta/k/test/
 php -S localhost:8000 router.php
 ```
 
-Otevři `http://localhost:8000/index.php`
+Otevři `https://diamondfish.cz/php-test/index.php`
 
 Pro Apache/Nginx – projekt využívá `.htaccess` s `mod_rewrite`.
 
@@ -65,7 +65,7 @@ test/
 
 ## API přehled
 
-**Základní URL:** `http://localhost:8000/api`
+**Základní URL:** `https://diamondfish.cz/php-test/api`
 
 Frontend komunikuje výhradně přes `fetch()` na REST endpointy – žádné `?path=` parametry.
 
@@ -119,7 +119,7 @@ Frontend komunikuje výhradně přes `fetch()` na REST endpointy – žádné `?
 ### Přihlášení (Bearer token)
 
 ```bash
-curl -X POST http://localhost:8765/api/auth/login \
+curl -X POST https://diamondfish.cz/php-test/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"jan.novak@test.cz","password":"heslo123"}'
 ```
@@ -221,7 +221,7 @@ GET /api/products?sort=-price         # sestupně
 ### Příklady pro curl
 
 ```bash
-BASE="http://localhost:8000/api"
+BASE="https://diamondfish.cz/php-test/api"
 
 # Produkty kategorie electronics
 curl "$BASE/products?q=%7B%22category%22%3A%22electronics%22%7D"
@@ -253,7 +253,7 @@ curl -H "Authorization: Bearer test-token-abc123" \
 
 **cURL ověření:**
 ```bash
-BASE="http://localhost:8000/api"
+BASE="https://diamondfish.cz/php-test/api"
 
 # Správné přihlášení
 curl -X POST "$BASE/auth/login" \
@@ -311,36 +311,15 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 
 ---
 
-### Scénář 4 – Nesoulad s desetinnými čísly (10 → 10.2)
-
-**Cíl:** Odhalit, že produkt ID=1 má cenu uloženou jako integer `10` místo float `10.2`.
-
-**Postup:**
-1. `curl http://localhost:8000/api/products/1`
-2. V odpovědi zkontroluj: `"price": 10` vs. specifikace `"price": 10.2`
-3. Na stránce `/pages/product-detail.php?id=1` vidíš badge `typeof: number` + `isInt: true`
-4. Na stránce `/pages/errors.php` klikni **"Načíst a zobrazit typy cen"** a sleduj console.table
-5. Zavolej `console.table` z DevTools – ověř, které produkty mají integer cenu
-
-**Co nahlásit:**
-- Produkt ID=1: `price = 10` (integer) – dle specifikace má být `10.2` (float)
-- Produkty ID=4 a ID=16: `price = "19,90"` resp. `"8,50"` (string s desetinnou čárkou) – viz Scénář 5
-- Produkt ID=10: `price = 0` – edge case, ověřit, zda se zobrazuje správně (ne jako „–")
-
----
-
-### Scénář 5 – Desetinná čárka místo tečky
+### Scénář 4 – Desetinná čárka místo tečky
 
 **Cíl:** Odhalit a nahlásit produkty s cenou jako string s čárkou (`"19,90"`) a chybu ve formuláři.
 
 **Postup:**
-1. `curl http://localhost:8000/api/products/4` – `"price": "19,90"` (string!)
+1. `curl https://diamondfish.cz/php-test/api/products/4` – `"price": "19,90"` (string!)
 2. V JS: `parseFloat("19,90")` vrátí `19`, ne `19.9` – otevři DevTools Console a vyzkoušej
 3. Na stránce `/pages/products.php` – cena produktu ID=4 se zobrazí jako `"19,90" Kč` (řetězec)
-4. Na stránce `/pages/product-detail.php?id=4` – badge zobrazí `typeof: string`
-5. Zkus POST nového produktu s `"price": "25,50"` (čárka)
-   - Přes cURL: `curl -X POST http://localhost:8000/api/products -H "Content-Type: application/json" -H "Authorization: Bearer test-token-abc123" -d '{"name":"Bug","price":"25,50"}'`
-6. API vrátí `422` s chybou: **"price obsahuje desetinnou čárku místo tečky"**
+4. API vrátí `422` s chybou: **"price obsahuje desetinnou čárku místo tečky"**
 
 **Co nahlásit:**
 - data/products.json: ID=4 `price="19,90"`, ID=16 `price="8,50"` – chybný datový typ
@@ -349,7 +328,7 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 
 ---
 
-### Scénář 6 – Validace formuláře
+### Scénář 5 – Validace formuláře
 
 **Cíl:** Otestovat chování formuláře při neplatných vstupech.
 
@@ -374,7 +353,7 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 #### Bug D: Role select ignorovaná backendem
 1. Nastav Role na **Administrátor** a odešli formulář
 2. V odpovědi uvidíš `"role": "user"` – backend vždy nastaví `user`
-3. Ověř přes cURL: `curl -X POST http://localhost:8000/api/users -H "Content-Type: application/json" -d '{"role":"admin","username":"x","email":"x@test.cz","password":"heslo123"}'` → response `"role":"user"`
+3. Ověř přes cURL: `curl -X POST https://diamondfish.cz/php-test/api/users -H "Content-Type: application/json" -d '{"role":"admin","username":"x","email":"x@test.cz","password":"heslo123"}'` → response `"role":"user"`
 
 #### Bug E: Shoda hesel jen na JS, ne na backendu
 1. Zadej různá hesla – JS zobrazí chybu, formulář nejde odeslat
@@ -383,7 +362,7 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 
 ---
 
-### Scénář 7 – Responsivita
+### Scénář 6 – Responsivita
 
 **Cíl:** Ověřit chování stránek na různých šířkách obrazovky.
 
@@ -405,7 +384,7 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 
 ---
 
-### Scénář 8 – Scrollování
+### Scénář 7 – Scrollování
 
 **Cíl:** Ověřit UX při scrollování a velké množství dat.
 
@@ -426,7 +405,7 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 
 ---
 
-### Scénář 9 – Backend chyby (500, 404, 401, 403)
+### Scénář 8 – Backend chyby (500, 404, 401, 403)
 
 **Cíl:** Ověřit správné zpracování a zobrazení HTTP chybových stavů.
 
@@ -447,7 +426,7 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 
 **cURL ověření:**
 ```bash
-BASE="http://localhost:8000/api"
+BASE="https://diamondfish.cz/php-test/api"
 curl -v "$BASE/status/500"
 curl -v "$BASE/users"
 curl -v -H "Authorization: Bearer test-token-abc123" "$BASE/users"
@@ -462,7 +441,7 @@ curl -v -X DELETE -H "Authorization: Bearer admin-token-xyz456" "$BASE/products/
 
 ---
 
-### Scénář 10 – Práce s konzolí, cURL, SSH, Gitem
+### Scénář 9 – Práce s konzolí, cURL, SSH, Gitem
 
 **Cíl:** Prověřit technické dovednosti testera.
 
@@ -484,7 +463,7 @@ console.table([{id:1, price:10, type:'int'}, {id:4, price:'19,90', type:'string'
 
 #### cURL
 ```bash
-BASE="http://localhost:8000/api"
+BASE="https://diamondfish.cz/php-test/api"
 
 # Přihlášení a získání tokenu
 curl -X POST "$BASE/auth/login" \
@@ -533,8 +512,8 @@ git show HEAD:data/products.json | python3 -m json.tool | grep '"price"'
 > `tests/` je v `.gitignore` – soubory jsou přítomny lokálně, ale nejdou do repozitáře.
 
 ```bash
-# Nastav URL svého prostředí (výchozí: http://localhost:8765)
-export BASE_URL=http://localhost:8000
+# Nastav URL svého prostředí (výchozí: https://diamondfish.cz/php-test)
+export BASE_URL=https://diamondfish.cz/php-test
 
 # Spusť všechny testy
 php tests/run_all.php
