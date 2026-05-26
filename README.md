@@ -521,3 +521,148 @@ php tests/test_errors.php     # HTTP chyby, auth
 
 Testy označené `DETEKCE BUGU:` jsou záměrně nastaveny tak, aby selhaly na vestavěných chybách.
 Tester by měl bugy **opravit** (v JSON datech nebo kódu) a pak testy spustit znovu – **všechna `✗` se změní na `✓`**.
+
+---
+
+## E2E testy – vinozezajeci.cz
+
+Testovaná aplikace: **https://vinozezajeci.cz** (Nuxt SPA)
+
+Před testováním:
+- Otevři aplikaci v **anonymním okně** (čistý košík, žádné cookies)
+- Otevři DevTools → Network (filtr: Fetch/XHR) a Console
+- Při každém kroku sleduj síťové požadavky a případné JS chyby v konzoli
+
+---
+
+### E2E-1 – Přidání vína z homepage
+
+**URL:** `https://vinozezajeci.cz/`
+
+**Postup:**
+1. Přejdi na homepage
+2. Najdi sekci **Nabídka vín** (viditelná po scrollu dolů)
+3. Klikni **Do košíku** u prvního vína (Müller Thurgau 2025, 190 Kč)
+4. Ověř vizuální feedback – změna tlačítka, toast notifikace nebo ikona košíku
+5. Klikni **Do košíku** u druhého vína (Sylvánské zelené 2025, 190 Kč)
+
+**Co ověřit:**
+- [ ] Tlačítko „Do košíku" reaguje na klik (spinner, změna textu nebo stavu)
+- [ ] Ikona košíku v navigaci zobrazuje počet položek nebo zvýrazní se
+- [ ] Druhý klik přidá druhé víno (košík má 2 položky), ne 2× to samé
+- [ ] V Network tabu: API volání pro přidání do košíku (POST nebo PATCH)
+- [ ] Žádné JS chyby v konzoli
+
+---
+
+### E2E-2 – Přidání vína z detailu produktu
+
+**URL:** `https://vinozezajeci.cz/wine`
+
+**Postup:**
+1. Přejdi na stránku `/wine` (seznam všech vín)
+2. Klikni na třetí víno (**Neuburské 2025**) – přejdi na detail
+3. Zkontroluj detail: název, odrůda, ročník, přívlastek, objem, alkohol, cena
+4. Nastav množství na **2** (pomocí `+` nebo číselného inputu)
+5. Klikni **Do košíku**
+6. Přejdi zpět na `/wine` a přidej ještě jedno jiné víno (klikni „Do košíku" přímo ze seznamu)
+
+**Co ověřit:**
+- [ ] Detail zobrazí všechna pole: Druh, Přívlastek, Barva, Odrůda, Objem, Ročník, Alkohol
+- [ ] Množství lze změnit před přidáním do košíku (input nebo +/-)
+- [ ] Po přidání 2 ks se košík správně aktualizuje (celková cena = 2 × cena vína)
+- [ ] Tlačítko „Nabídka vín" (zpět) funguje
+
+---
+
+### E2E-3 – Správa košíku (krok 1 pokladny)
+
+**URL:** `https://vinozezajeci.cz/cashdesk`
+
+**Předpoklad:** V košíku jsou alespoň 3 různé položky (z E2E-1 a E2E-2).
+
+**Postup:**
+1. Přejdi na `/cashdesk` (nebo klikni na ikonu košíku)
+2. Ověř, že košík zobrazuje všechny přidané položky se správnými cenami a množstvím
+3. **Navýšení množství:** U prvního vína zvyš množství na 3
+   - Ověř, že celková cena řádku se přepočítá (3 × cena)
+   - Ověř, že celková suma objednávky se aktualizuje
+4. **Snížení množství:** U téhož vína sniž množství zpět na 1
+   - Ověř přepočet ceny
+5. **Odstranění položky:** Klikni na tlačítko smazání (× nebo koš) u druhého vína
+   - Ověř, že položka zmizí ze seznamu
+   - Ověř, že celková cena je přepočítána bez odstraněné položky
+6. Zkontroluj info o dopravě zdarma: „Při objednávce nad 2500 Kč je doprava zdarma"
+   - Přidej víno tak, aby celková suma přesáhla 2500 Kč, a ověř, zda se stav změní
+
+**Co ověřit:**
+- [ ] Každá položka zobrazuje: název, cenu za kus, množství, cenu celkem za řádek
+- [ ] Přepočet celkové sumy probíhá okamžitě (bez nutnosti refreshe)
+- [ ] Odstranění položky je nenávratné (nebo nabídne undo)
+- [ ] Prázdný košík zobrazí stav „košík je prázdný" (ověř po odstranění všech položek)
+- [ ] Tlačítko „Zpět do obchodu" funguje
+
+---
+
+### E2E-4 – Vyplnění formuláře dopravy a platby (krok 2)
+
+**Předpoklad:** Košík obsahuje alespoň 1 položku.
+
+**Postup:**
+1. V košíku klikni na **Doprava a platba** (nebo „Pokračovat")
+2. Vyplň formulář kontaktních/doručovacích údajů:
+   - Jméno a příjmení
+   - E-mail
+   - Telefon
+   - Ulice a číslo popisné
+   - Město
+   - PSČ
+3. Vyber způsob dopravy (pokud je na výběr)
+4. Vyber způsob platby (pokud je na výběr)
+5. Pokračuj na krok 3 (Shrnutí)
+
+**Povinná pole – ověř chování při odeslání prázdného formuláře:**
+- [ ] Jméno – povinné? Zobrazí se chybová hláška?
+- [ ] E-mail – povinný? Validuje formát? (zkus `test@`, `testbezavinace`)
+- [ ] Telefon – povinný? Validuje formát?
+- [ ] Ulice – povinná?
+- [ ] Město – povinné?
+- [ ] PSČ – povinné? Validuje formát (5 číslic)?
+
+**Typy vstupů:**
+- [ ] PSČ – je pole `type="number"` nebo `type="text"`? Lze zadat písmena?
+- [ ] Telefon – je pole `type="tel"`? Lze zadat nečíselné znaky?
+- [ ] E-mail – je pole `type="email"`? Brání zadání neplatného formátu na úrovni HTML?
+
+**Co nahlásit:**
+- Pole bez validace (přijme libovolný text)
+- Chybová hláška, která nespecifikuje, které pole je špatně
+- Formulář, který při chybě ztratí již vyplněná data
+
+---
+
+### E2E-5 – Shrnutí objednávky (krok 3)
+
+**Postup:**
+1. Po úspěšném vyplnění formuláře přejdi na krok 3 (Shrnutí)
+2. Ověř zobrazené informace:
+
+**Kontrolní seznam:**
+- [ ] Seznam objednaných vín (název, množství, cena za ks, cena celkem za řádek)
+- [ ] Celková cena za zboží
+- [ ] Způsob dopravy + cena dopravy
+- [ ] Způsob platby
+- [ ] Doručovací adresa (jméno, ulice, město, PSČ)
+- [ ] Kontaktní e-mail a telefon
+- [ ] Celková cena objednávky (zboží + doprava)
+- [ ] Pokud suma > 2500 Kč: doprava zdarma (cena dopravy = 0 Kč)
+
+**Regresní ověření:**
+- [ ] Údaje na shrnutí přesně odpovídají tomu, co bylo zadáno ve formuláři
+- [ ] Množství a ceny odpovídají košíku z kroku 1
+- [ ] Po obnovení stránky (F5) shrnutí zůstane (nebo přesměruje na krok 1)
+
+**Co nahlásit:**
+- Nesoulad ceny v košíku vs. v shrnutí
+- Chybějící položka na shrnutí
+- Možnost přejít na shrnutí bez vyplnění formuláře (přímý URL `/cashdesk` + step param)
