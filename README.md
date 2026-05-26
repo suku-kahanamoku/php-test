@@ -280,27 +280,7 @@ GET /api/products?sort=-price         # sestupně
 
 ---
 
-### Scénář 3 – Gettery a settery produktů
-
-**Cíl:** Ověřit čtení (GET) a zápis (POST/PUT) dat přes API.
-
-**Postup:**
-1. GET `/api/products` – ověř strukturu odpovědi (success, data, meta)
-2. GET `/api/products/1` – ověř detail produktu
-3. POST nový produkt s platnými daty (přihlásit nebo použít token v hlavičce)
-4. GET nově vytvořeného produktu – ověř, že data sedí
-5. PUT (update) produktu – změň název a cenu
-6. GET upraveného produktu – ověř změny
-
-**Očekávané výsledky:**
-- GET vrací `{"success": true, "data": {...}, "meta": {...}}`
-- POST vrací `201 Created` s novým produktem
-- PUT vrací `200 OK` s aktualizovaným produktem
-- Všechna čísla jsou vrácena jako float (ne int)
-
----
-
-### Scénář 4 – Nesoulad s desetinnými čísly (10 → 10.2)
+### Scénář 3 – Nesoulad s desetinnými čísly (10 → 10.2)
 
 **Cíl:** Odhalit, že produkt ID=1 má cenu uloženou jako integer `10` místo float `10.2`.
 
@@ -313,32 +293,12 @@ GET /api/products?sort=-price         # sestupně
 
 **Co nahlásit:**
 - Produkt ID=1: `price = 10` (integer) – dle specifikace má být `10.2` (float)
-- Produkty ID=4 a ID=16: `price = "19,90"` resp. `"8,50"` (string s desetinnou čárkou) – viz Scénář 5
+- Produkty ID=4 a ID=16: `price = "19,90"` resp. `"8,50"` (string s desetinnou čárkou) – viz Scénář 4
 - Produkt ID=10: `price = 0` – edge case, ověřit, zda se zobrazuje správně (ne jako „–")
 
 ---
 
-### Scénář 5 – Desetinná čárka místo tečky
-
-**Cíl:** Odhalit a nahlásit produkty s cenou jako string s čárkou (`"19,90"`) a chybu ve formuláři.
-
-**Postup:**
-1. `curl https://diamondfish.cz/php-test/api/products/4` – `"price": "19,90"` (string!)
-2. V JS: `parseFloat("19,90")` vrátí `19`, ne `19.9` – otevři DevTools Console a vyzkoušej
-3. Na stránce `/pages/products.php` – cena produktu ID=4 se zobrazí jako `"19,90" Kč` (řetězec)
-4. Na stránce `/pages/product-detail.php?id=4` – badge zobrazí `typeof: string`
-5. Zkus POST nového produktu s `"price": "25,50"` (čárka)
-   - Přes cURL: `curl -X POST https://diamondfish.cz/php-test/api/products ...
-6. API vrátí `422` s chybou: **"price obsahuje desetinnou čárku místo tečky"**
-
-**Co nahlásit:**
-- data/products.json: ID=4 `price="19,90"`, ID=16 `price="8,50"` – chybný datový typ
-- JS: `parseFloat("19,90") === 19` – způsobuje chybný výpočet na frontendu
-- Formulář: pole pro cenu je `type="text"` – nebrání zadání čárky, mělo by být `type="number"` nebo mít validaci
-
----
-
-### Scénář 6 – Validace formuláře
+### Scénář 4 – Validace formuláře
 
 **Cíl:** Otestovat chování formuláře při neplatných vstupech.
 
@@ -370,9 +330,20 @@ GET /api/products?sort=-price         # sestupně
 2. Přes cURL odešli POST `/api/users` bez pole `password2` – backend hesla neporovnává
 3. Nahlásit: chybí server-side porovnání hesel
 
+#### Bug F: Pole ceny nepřijímá desetinnou čárku
+1. Na stránce `/pages/product-detail.php` (editace produktu) zadej do pole ceny `"25,50"` (čárka)
+2. Formulář to přijme bez JS chyby – pole je `type="text"`
+3. API vrátí `422`: `"price uses a decimal comma instead of a dot"`
+4. Ověř v DevTools Console: `parseFloat("19,90")` vrátí `19`, ne `19.9`
+
+**Co nahlásit:**
+- `data/products.json`: ID=4 `price="19,90"`, ID=16 `price="8,50"` – chybný datový typ (string místo float)
+- JS: `parseFloat("19,90") === 19` – způsobuje chybný výpočet na frontendu
+- Formulář: pole pro cenu je `type="text"` – nebrání zadání čárky, mělo by být `type="number"` nebo mít validaci
+
 ---
 
-### Scénář 7 – Responsivita
+### Scénář 5 – Responsivita
 
 **Cíl:** Ověřit chování stránek na různých šířkách obrazovky.
 
@@ -394,7 +365,7 @@ GET /api/products?sort=-price         # sestupně
 
 ---
 
-### Scénář 8 – Scrollování
+### Scénář 6 – Scrollování
 
 **Cíl:** Ověřit UX při scrollování a velké množství dat.
 
@@ -415,7 +386,7 @@ GET /api/products?sort=-price         # sestupně
 
 ---
 
-### Scénář 9 – Backend chyby (500, 404, 401, 403)
+### Scénář 7 – Backend chyby (500, 404, 401, 403)
 
 **Cíl:** Ověřit správné zpracování a zobrazení HTTP chybových stavů.
 
