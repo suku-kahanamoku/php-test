@@ -14,7 +14,7 @@ cd /cesta/k/test/
 php -S localhost:8000 router.php
 ```
 
-Otevři `https://diamondfish.cz/php-test/index.php`
+Otevři `http://localhost:8000/index.php`
 
 Pro Apache/Nginx – projekt využívá `.htaccess` s `mod_rewrite`.
 
@@ -65,53 +65,26 @@ test/
 
 ## API přehled
 
-**Základní URL:** `https://diamondfish.cz/php-test/api`
+**Základní URL:** `http://localhost:8000/api`
 
 Frontend komunikuje výhradně přes `fetch()` na REST endpointy – žádné `?path=` parametry.
 
 ### Produkty
 
-| Metoda | Endpoint         | Auth       | Popis                                     |
-|--------|------------------|------------|-------------------------------------------|
-| GET    | `/products`      | –          | Seznam, q={}, sort, page, limit           |
-| GET    | `/products/{id}` | –          | Jeden produkt                             |
-| POST   | `/products`      | user/admin | Vytvořit (plná validace polí)             |
-| PUT    | `/products/{id}` | user/admin | Upravit (plná validace polí)              |
-| DELETE | `/products/{id}` | **admin**  | Smazat                                    |
-
-#### Product fields & validation rules
-
-| Field            | Type    | Required | Rules                                                              |
-|------------------|---------|----------|--------------------------------------------------------------------|
-| `name`           | string  | POST ✓   | min 2, max 200 characters                                         |
-| `sku`            | string  | –        | max 50 chars, only `A-Za-z0-9-_`, must be unique                  |
-| `price`          | float   | POST ✓   | numeric, dot as decimal separator, ≥ 0                            |
-| `category`       | enum    | –        | `electronics`, `gadgets`, `home`, `office`, `garden`, `sports`, `other` |
-| `status`         | enum    | –        | `active`, `inactive`, `discontinued`                              |
-| `stock_quantity` | integer | –        | whole number (no float), ≥ 0                                      |
-| `color`          | enum    | –        | `red`, `blue`, `green`, `black`, `white`, `gray`, `brown`, `gold`, `silver` |
-| `unit`           | enum    | –        | `ks`, `m`, `kg`, `l`                                              |
-| `weight`         | float   | –        | numeric, dot as decimal separator, ≥ 0                            |
-| `description`    | string  | –        | max 1000 characters                                               |
-| `created_at`     | date    | –        | format `YYYY-MM-DD`                                               |
+| Metoda | Endpoint         | Auth       | Popis                           |
+|--------|------------------|------------|---------------------------------|
+| GET    | `/products`      | –          | Seznam, q={}, sort, page, limit |
+| GET    | `/products/{id}` | –          | Jeden produkt                   |
+| POST   | `/products`      | user/admin | Vytvořit (validuje cenu)        |
+| PUT    | `/products/{id}` | user/admin | Upravit                         |
+| DELETE | `/products/{id}` | **admin**  | Smazat                          |
 
 ### Enumerace
 
-| Metoda | Endpoint                  | Auth      | Popis                              |
-|--------|---------------------------|-----------|------------------------------------|
-| GET    | `/enums`                  | –         | Všechny číselníky                  |
-| GET    | `/enums/{type}`           | –         | Konkrétní číselník                 |
-| POST   | `/enums/{type}`           | **admin** | Přidat novou hodnotu do číselníku  |
-| PUT    | `/enums/{type}/{value}`   | **admin** | Upravit label existující hodnoty   |
-
-Available enum types: `categories`, `statuses`, `colors`, `units`, `roles`
-
-#### Enum POST/PUT fields & validation rules
-
-| Field   | Type   | Required | Rules                                                              |
-|---------|--------|----------|--------------------------------------------------------------------|
-| `value` | string | POST ✓   | lowercase, only `a-z0-9_-`, max 50 chars, must be unique in type  |
-| `label` | string | ✓        | non-empty, max 100 characters                                      |
+| Metoda | Endpoint         | Auth | Popis                  |
+|--------|------------------|------|------------------------|
+| GET    | `/enums`         | –    | Všechny číselníky      |
+| GET    | `/enums/{type}`  | –    | Konkrétní číselník     |
 
 ### Uživatelé
 
@@ -146,7 +119,9 @@ Available enum types: `categories`, `statuses`, `colors`, `units`, `roles`
 ### Přihlášení (Bearer token)
 
 ```bash
-curl -X POST https://diamondfish.cz/php-test/api/auth/login ...
+curl -X POST http://localhost:8765/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jan.novak@test.cz","password":"heslo123"}'
 ```
 
 Odpověď:
@@ -243,6 +218,23 @@ GET /api/products?sort=price          # vzestupně
 GET /api/products?sort=-price         # sestupně
 ```
 
+### Příklady pro curl
+
+```bash
+BASE="http://localhost:8000/api"
+
+# Produkty kategorie electronics
+curl "$BASE/products?q=%7B%22category%22%3A%22electronics%22%7D"
+
+# Produkty s cenou >= 100
+curl "$BASE/products?q=%7B%22price%22%3A%7B%22value%22%3A100%2C%22operator%22%3A%22gte%22%7D%7D"
+
+# Uživatelé s emailem končícím @test.cz (vyžaduje auth)
+curl -H "Authorization: Bearer test-token-abc123" \
+     "$BASE/users?q=%7B%22email%22%3A%7B%22value%22%3A%22%40test.cz%22%2C%22operator%22%3A%22end%22%7D%7D"
+```
+
+---
 
 ## Testovací scénáře
 
@@ -259,6 +251,25 @@ GET /api/products?sort=-price         # sestupně
 6. Zkus přihlásit se špatným heslem → 401, chybová hláška
 7. Zkus přihlásit neaktivního uživatele `tomas.kral@` → 403
 
+**cURL ověření:**
+```bash
+BASE="http://localhost:8000/api"
+
+# Správné přihlášení
+curl -X POST "$BASE/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"admin@test.cz","password":"Admin1234!"}'
+
+# Špatné heslo → 401
+curl -X POST "$BASE/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"admin@test.cz","password":"spatne"}'
+
+# Profil přihlášeného uživatele
+curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
+```
+
+---
 
 ### Scénář 2 – Správné pochopení q={} syntaxe
 
@@ -280,12 +291,32 @@ GET /api/products?sort=-price         # sestupně
 
 ---
 
-### Scénář 3 – Nesoulad s desetinnými čísly (10 → 10.2)
+### Scénář 3 – Gettery a settery produktů
+
+**Cíl:** Ověřit čtení (GET) a zápis (POST/PUT) dat přes API.
+
+**Postup:**
+1. GET `/api/products` – ověř strukturu odpovědi (success, data, meta)
+2. GET `/api/products/1` – ověř detail produktu
+3. POST nový produkt s platnými daty (přihlásit nebo použít token v hlavičce)
+4. GET nově vytvořeného produktu – ověř, že data sedí
+5. PUT (update) produktu – změň název a cenu
+6. GET upraveného produktu – ověř změny
+
+**Očekávané výsledky:**
+- GET vrací `{"success": true, "data": {...}, "meta": {...}}`
+- POST vrací `201 Created` s novým produktem
+- PUT vrací `200 OK` s aktualizovaným produktem
+- Všechna čísla jsou vrácena jako float (ne int)
+
+---
+
+### Scénář 4 – Nesoulad s desetinnými čísly (10 → 10.2)
 
 **Cíl:** Odhalit, že produkt ID=1 má cenu uloženou jako integer `10` místo float `10.2`.
 
 **Postup:**
-1. `curl https://diamondfish.cz/php-test/api/products/1`
+1. `curl http://localhost:8000/api/products/1`
 2. V odpovědi zkontroluj: `"price": 10` vs. specifikace `"price": 10.2`
 3. Na stránce `/pages/product-detail.php?id=1` vidíš badge `typeof: number` + `isInt: true`
 4. Na stránce `/pages/errors.php` klikni **"Načíst a zobrazit typy cen"** a sleduj console.table
@@ -293,12 +324,32 @@ GET /api/products?sort=-price         # sestupně
 
 **Co nahlásit:**
 - Produkt ID=1: `price = 10` (integer) – dle specifikace má být `10.2` (float)
-- Produkty ID=4 a ID=16: `price = "19,90"` resp. `"8,50"` (string s desetinnou čárkou) – viz Scénář 4
+- Produkty ID=4 a ID=16: `price = "19,90"` resp. `"8,50"` (string s desetinnou čárkou) – viz Scénář 5
 - Produkt ID=10: `price = 0` – edge case, ověřit, zda se zobrazuje správně (ne jako „–")
 
 ---
 
-### Scénář 4 – Validace formuláře
+### Scénář 5 – Desetinná čárka místo tečky
+
+**Cíl:** Odhalit a nahlásit produkty s cenou jako string s čárkou (`"19,90"`) a chybu ve formuláři.
+
+**Postup:**
+1. `curl http://localhost:8000/api/products/4` – `"price": "19,90"` (string!)
+2. V JS: `parseFloat("19,90")` vrátí `19`, ne `19.9` – otevři DevTools Console a vyzkoušej
+3. Na stránce `/pages/products.php` – cena produktu ID=4 se zobrazí jako `"19,90" Kč` (řetězec)
+4. Na stránce `/pages/product-detail.php?id=4` – badge zobrazí `typeof: string`
+5. Zkus POST nového produktu s `"price": "25,50"` (čárka)
+   - Přes cURL: `curl -X POST http://localhost:8000/api/products -H "Content-Type: application/json" -H "Authorization: Bearer test-token-abc123" -d '{"name":"Bug","price":"25,50"}'`
+6. API vrátí `422` s chybou: **"price obsahuje desetinnou čárku místo tečky"**
+
+**Co nahlásit:**
+- data/products.json: ID=4 `price="19,90"`, ID=16 `price="8,50"` – chybný datový typ
+- JS: `parseFloat("19,90") === 19` – způsobuje chybný výpočet na frontendu
+- Formulář: pole pro cenu je `type="text"` – nebrání zadání čárky, mělo by být `type="number"` nebo mít validaci
+
+---
+
+### Scénář 6 – Validace formuláře
 
 **Cíl:** Otestovat chování formuláře při neplatných vstupech.
 
@@ -323,27 +374,16 @@ GET /api/products?sort=-price         # sestupně
 #### Bug D: Role select ignorovaná backendem
 1. Nastav Role na **Administrátor** a odešli formulář
 2. V odpovědi uvidíš `"role": "user"` – backend vždy nastaví `user`
-3. Ověř přes cURL: `curl -X POST https://diamondfish.cz/php-test/api/users -H "Content-Type: application/json" -d '{"role":"admin","username":"x","email":"x@test.cz","password":"heslo123"}'` → response `"role":"user"`
+3. Ověř přes cURL: `curl -X POST http://localhost:8000/api/users -H "Content-Type: application/json" -d '{"role":"admin","username":"x","email":"x@test.cz","password":"heslo123"}'` → response `"role":"user"`
 
 #### Bug E: Shoda hesel jen na JS, ne na backendu
 1. Zadej různá hesla – JS zobrazí chybu, formulář nejde odeslat
 2. Přes cURL odešli POST `/api/users` bez pole `password2` – backend hesla neporovnává
 3. Nahlásit: chybí server-side porovnání hesel
 
-#### Bug F: Pole ceny nepřijímá desetinnou čárku
-1. Na stránce `/pages/product-detail.php` (editace produktu) zadej do pole ceny `"25,50"` (čárka)
-2. Formulář to přijme bez JS chyby – pole je `type="text"`
-3. API vrátí `422`: `"price uses a decimal comma instead of a dot"`
-4. Ověř v DevTools Console: `parseFloat("19,90")` vrátí `19`, ne `19.9`
-
-**Co nahlásit:**
-- `data/products.json`: ID=4 `price="19,90"`, ID=16 `price="8,50"` – chybný datový typ (string místo float)
-- JS: `parseFloat("19,90") === 19` – způsobuje chybný výpočet na frontendu
-- Formulář: pole pro cenu je `type="text"` – nebrání zadání čárky, mělo by být `type="number"` nebo mít validaci
-
 ---
 
-### Scénář 5 – Responsivita
+### Scénář 7 – Responsivita
 
 **Cíl:** Ověřit chování stránek na různých šířkách obrazovky.
 
@@ -365,7 +405,7 @@ GET /api/products?sort=-price         # sestupně
 
 ---
 
-### Scénář 6 – Scrollování
+### Scénář 8 – Scrollování
 
 **Cíl:** Ověřit UX při scrollování a velké množství dat.
 
@@ -386,7 +426,7 @@ GET /api/products?sort=-price         # sestupně
 
 ---
 
-### Scénář 7 – Backend chyby (500, 404, 401, 403)
+### Scénář 9 – Backend chyby (500, 404, 401, 403)
 
 **Cíl:** Ověřit správné zpracování a zobrazení HTTP chybových stavů.
 
@@ -407,7 +447,7 @@ GET /api/products?sort=-price         # sestupně
 
 **cURL ověření:**
 ```bash
-BASE="https://diamondfish.cz/php-test/api"
+BASE="http://localhost:8000/api"
 curl -v "$BASE/status/500"
 curl -v "$BASE/users"
 curl -v -H "Authorization: Bearer test-token-abc123" "$BASE/users"
@@ -422,146 +462,137 @@ curl -v -X DELETE -H "Authorization: Bearer admin-token-xyz456" "$BASE/products/
 
 ---
 
-## E2E testy – vinozezajeci.cz
+### Scénář 10 – Práce s konzolí, cURL, SSH, Gitem
 
-Testovaná aplikace: **https://vinozezajeci.cz** (Nuxt SPA)
+**Cíl:** Prověřit technické dovednosti testera.
 
-Před testováním:
-- Otevři aplikaci v **anonymním okně** (čistý košík, žádné cookies)
-- Otevři DevTools → Network (filtr: Fetch/XHR) a Console
-- Při každém kroku sleduj síťové požadavky a případné JS chyby v konzoli
+#### Konzole (DevTools)
+```javascript
+// Otevři stránku /pages/errors.php a v konzoli:
+fetch('/api/products/1').then(r => r.json()).then(console.log)
 
----
+// Autentizovaný request přes konzoli
+const token = localStorage.getItem('auth_token');
+fetch('/api/users', {
+  headers: { 'Authorization': 'Bearer ' + token }
+}).then(r => r.json()).then(console.table)
 
-### E2E-1 – Přidání vína z homepage
+console.table([{id:1, price:10, type:'int'}, {id:4, price:'19,90', type:'string'}])
+```
 
-**URL:** `https://vinozezajeci.cz/`
+**Úkol:** Načti seznam produktů přes konzoli, najdi všechny s `typeof price !== 'number'`
 
-**Postup:**
-1. Přejdi na homepage
-2. Najdi sekci **Nabídka vín** (viditelná po scrollu dolů)
-3. Klikni **Do košíku** u prvního vína (Müller Thurgau 2025, 190 Kč)
-4. Ověř vizuální feedback – změna tlačítka, toast notifikace nebo ikona košíku
-5. Klikni **Do košíku** u druhého vína (Sylvánské zelené 2025, 190 Kč)
+#### cURL
+```bash
+BASE="http://localhost:8000/api"
 
-**Co ověřit:**
-- [ ] Tlačítko „Do košíku" reaguje na klik (spinner, změna textu nebo stavu)
-- [ ] Ikona košíku v navigaci zobrazuje počet položek nebo zvýrazní se
-- [ ] Druhý klik přidá druhé víno (košík má 2 položky), ne 2× to samé
-- [ ] V Network tabu: API volání pro přidání do košíku (POST nebo PATCH)
-- [ ] Žádné JS chyby v konzoli
+# Přihlášení a získání tokenu
+curl -X POST "$BASE/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"jan.novak@test.cz","password":"heslo123"}'
 
----
+# Autentizovaný GET
+curl -H "Authorization: Bearer test-token-abc123" "$BASE/users"
 
-### E2E-2 – Přidání vína z detailu produktu
+# POST produkt
+curl -X POST "$BASE/products" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer test-token-abc123" \
+     -d '{"name":"Nový produkt","price":29.99,"category":"other"}'
 
-**URL:** `https://vinozezajeci.cz/wine`
+# Verbose výstup (hlavičky, status)
+curl -v "$BASE/status/401"
+```
 
-**Postup:**
-1. Přejdi na stránku `/wine` (seznam všech vín)
-2. Klikni na třetí víno (**Neuburské 2025**) – přejdi na detail
-3. Zkontroluj detail: název, odrůda, ročník, přívlastek, objem, alkohol, cena
-4. Nastav množství na **2** (pomocí `+` nebo číselného inputu)
-5. Klikni **Do košíku**
-6. Přejdi zpět na `/wine` a přidej ještě jedno jiné víno (klikni „Do košíku" přímo ze seznamu)
+#### SSH
+```bash
+ssh user@server.cz
+ssh -i ~/.ssh/id_rsa user@server.cz -p 2222
+scp soubor.json user@server.cz:/var/www/test/data/
+```
 
-**Co ověřit:**
-- [ ] Detail zobrazí všechna pole: Druh, Přívlastek, Barva, Odrůda, Objem, Ročník, Alkohol
-- [ ] Množství lze změnit před přidáním do košíku (input nebo +/-)
-- [ ] Po přidání 2 ks se košík správně aktualizuje (celková cena = 2 × cena vína)
-- [ ] Tlačítko „Nabídka vín" (zpět) funguje
+#### Git
+```bash
+git clone <repo-url>
+git checkout -b feature/oprava-ceny
+git add data/products.json
+git commit -m "fix: oprava datoveho typu price u produktu ID=1 (integer → float)"
+git push origin feature/oprava-ceny
 
----
+git log --oneline -5
+git diff HEAD~1 data/products.json
+git show HEAD:data/products.json | python3 -m json.tool | grep '"price"'
+```
 
-### E2E-3 – Správa košíku (krok 1 pokladny)
-
-**URL:** `https://vinozezajeci.cz/cashdesk`
-
-**Předpoklad:** V košíku jsou alespoň 3 různé položky (z E2E-1 a E2E-2).
-
-**Postup:**
-1. Přejdi na `/cashdesk` (nebo klikni na ikonu košíku)
-2. Ověř, že košík zobrazuje všechny přidané položky se správnými cenami a množstvím
-3. **Navýšení množství:** U prvního vína zvyš množství na 3
-   - Ověř, že celková cena řádku se přepočítá (3 × cena)
-   - Ověř, že celková suma objednávky se aktualizuje
-4. **Snížení množství:** U téhož vína sniž množství zpět na 1
-   - Ověř přepočet ceny
-5. **Odstranění položky:** Klikni na tlačítko smazání (× nebo koš) u druhého vína
-   - Ověř, že položka zmizí ze seznamu
-   - Ověř, že celková cena je přepočítána bez odstraněné položky
-6. Zkontroluj info o dopravě zdarma: „Při objednávce nad 2500 Kč je doprava zdarma"
-   - Přidej víno tak, aby celková suma přesáhla 2500 Kč, a ověř, zda se stav změní
-
-**Co ověřit:**
-- [ ] Každá položka zobrazuje: název, cenu za kus, množství, cenu celkem za řádek
-- [ ] Přepočet celkové sumy probíhá okamžitě (bez nutnosti refreshe)
-- [ ] Odstranění položky je nenávratné (nebo nabídne undo)
-- [ ] Prázdný košík zobrazí stav „košík je prázdný" (ověř po odstranění všech položek)
-- [ ] Tlačítko „Zpět do obchodu" funguje
+**Úkol:** Vytvoř branch `bugfix/price-types`, oprav data v `products.json` (změň `10` na `10.2`, `"19,90"` na `19.90`, `"8,50"` na `8.50`) a commitni s popisnou commit message.
 
 ---
 
-### E2E-4 – Vyplnění formuláře dopravy a platby (krok 2)
+## Spuštění automatizovaných testů
 
-**Předpoklad:** Košík obsahuje alespoň 1 položku.
+> `tests/` je v `.gitignore` – soubory jsou přítomny lokálně, ale nejdou do repozitáře.
 
-**Postup:**
-1. V košíku klikni na **Doprava a platba** (nebo „Pokračovat")
-2. Vyplň formulář kontaktních/doručovacích údajů:
-   - Jméno a příjmení
-   - E-mail
-   - Telefon
-   - Ulice a číslo popisné
-   - Město
-   - PSČ
-3. Vyber způsob dopravy (pokud je na výběr)
-4. Vyber způsob platby (pokud je na výběr)
-5. Pokračuj na krok 3 (Shrnutí)
+```bash
+# Nastav URL svého prostředí (výchozí: http://localhost:8765)
+export BASE_URL=http://localhost:8000
 
-**Povinná pole – ověř chování při odeslání prázdného formuláře:**
-- [ ] Jméno – povinné? Zobrazí se chybová hláška?
-- [ ] E-mail – povinný? Validuje formát? (zkus `test@`, `testbezavinace`)
-- [ ] Telefon – povinný? Validuje formát?
-- [ ] Ulice – povinná?
-- [ ] Město – povinné?
-- [ ] PSČ – povinné? Validuje formát (5 číslic)?
+# Spusť všechny testy
+php tests/run_all.php
 
-**Typy vstupů:**
-- [ ] PSČ – je pole `type="number"` nebo `type="text"`? Lze zadat písmena?
-- [ ] Telefon – je pole `type="tel"`? Lze zadat nečíselné znaky?
-- [ ] E-mail – je pole `type="email"`? Brání zadání neplatného formátu na úrovni HTML?
+# Nebo jednotlivé sady
+php tests/test_api_q.php      # q={} syntaxe
+php tests/test_products.php   # produkty, datové typy
+php tests/test_users.php      # uživatelé, auth, login endpoint
+php tests/test_enums.php      # číselníky
+php tests/test_errors.php     # HTTP chyby, auth
+```
 
-**Co nahlásit:**
-- Pole bez validace (přijme libovolný text)
-- Chybová hláška, která nespecifikuje, které pole je špatně
-- Formulář, který při chybě ztratí již vyplněná data
+### Interpretace výsledků
+
+- `✓` zelený = test prošel – chování je správné
+- `✗` červený = test selhal – **záměrný bug byl detekován** nebo skutečná chyba
+
+Testy označené `DETEKCE BUGU:` jsou záměrně nastaveny tak, aby selhaly na vestavěných chybách.
+Tester by měl bugy **opravit** (v JSON datech nebo kódu) a pak testy spustit znovu – **všechna `✗` se změní na `✓`**.
 
 ---
 
-### E2E-5 – Shrnutí objednávky (krok 3)
+## Přehled záměrných bugů
 
-**Postup:**
-1. Po úspěšném vyplnění formuláře přejdi na krok 3 (Shrnutí)
-2. Ověř zobrazené informace:
+| ID  | Soubor                | Typ chyby          | Popis                                                       |
+|-----|-----------------------|--------------------|-------------------------------------------------------------|
+| B1  | `data/products.json`  | Datový typ         | `ID=1: price=10` (integer) – spec říká `10.2` (float)       |
+| B2  | `data/products.json`  | Desetinná čárka    | `ID=4: price="19,90"` – string s čárkou místo tečky         |
+| B3  | `data/products.json`  | Desetinná čárka    | `ID=16: price="8,50"` – string s čárkou místo tečky         |
+| B4  | `data/products.json`  | Null handling      | `ID=7: description=null` – frontend musí ošetřit null       |
+| B5  | `data/products.json`  | Edge case          | `ID=10: price=0` – musí se zobrazit jako "0 Kč", ne prázdně |
+| B6  | `data/users.json`     | Neplatné emaily    | `ID=4: "tomas.kral@"`, `ID=5: "lucie@free"`, `ID=8: "test"` |
+| B7  | `pages/products.php`  | Responsivita       | Tabulka bez `.table-responsive` – přetéká na mobilu         |
+| B8  | `pages/user-form.php` | UX / accessibility | Pole `username` je readonly bez vizuálního rozlišení        |
+| B9  | `pages/user-form.php` | Validace           | Email validace jen dle `@` – přijme `test@` nebo `a@b`      |
+| B10 | `pages/user-form.php` | Security / UX      | Role select je zobrazen, ale backend ho vždy ignoruje       |
+| B11 | `pages/user-form.php` | Bezpečnost         | Shoda hesel se ověřuje jen na JS, ne na backendu            |
+| B12 | `pages/scroll.php`    | Performance        | 100 řádků bez virtuálního scrollu, načtení najednou         |
+| B13 | `api/index.php`       | q={} limit filtr   | Kombinace gte+lte přes jedno pole přepíše první podmínku    |
+| B14 | `pages/products.php`  | Cena jako string   | `parseFloat("19,90") === 19` v JS – chybné zobrazení ceny   |
 
-**Kontrolní seznam:**
-- [ ] Seznam objednaných vín (název, množství, cena za ks, cena celkem za řádek)
-- [ ] Celková cena za zboží
-- [ ] Způsob dopravy + cena dopravy
-- [ ] Způsob platby
-- [ ] Doručovací adresa (jméno, ulice, město, PSČ)
-- [ ] Kontaktní e-mail a telefon
-- [ ] Celková cena objednávky (zboží + doprava)
-- [ ] Pokud suma > 2500 Kč: doprava zdarma (cena dopravy = 0 Kč)
+---
 
-**Regresní ověření:**
-- [ ] Údaje na shrnutí přesně odpovídají tomu, co bylo zadáno ve formuláři
-- [ ] Množství a ceny odpovídají košíku z kroku 1
-- [ ] Po obnovení stránky (F5) shrnutí zůstane (nebo přesměruje na krok 1)
+## Hodnotící kritéria
 
-**Co nahlásit:**
-- Nesoulad ceny v košíku vs. v shrnutí
-- Chybějící položka na shrnutí
-- Možnost přejít na shrnutí bez vyplnění formuláře (přímý URL `/cashdesk` + step param)
-
+| Oblast                          | Body | Popis                                                              |
+|---------------------------------|------|--------------------------------------------------------------------|
+| Login & Bearer token            |  10  | Přihlášení, token v localStorage, autentizovaný request            |
+| q={} syntaxe – základní         |  10  | Správné sestavení a odeslání dotazu přes formulář                  |
+| q={} syntaxe – pokročilé        |  10  | Operátory (contains, start, end, gte, lte, in, isnull)             |
+| GET / SET – produkty            |  10  | Čtení a zápis přes API, správná struktura odpovědi                 |
+| Decimal integer bug             |  10  | Detekce, popis a oprava B1 (price=10 → 10.2)                       |
+| Decimal comma bug               |  10  | Detekce, popis a oprava B2+B3 (čárka → tečka)                      |
+| Validace formuláře              |  10  | Nalezení B8–B11 a navržení správného řešení                        |
+| Responsivita                    |  10  | Detekce B7, porovnání Tabulka A vs B, breakpointy                  |
+| Scroll / Performance            |   5  | Popis B12, návrh řešení (paginace, virtual scroll)                 |
+| HTTP chyby – frontend           |  10  | Správné zobrazení 500/404/401/403 v UI                             |
+| cURL & konzole                  |  10  | Praktická demonstrace GET/POST/DELETE s tokeny                     |
+| SSH                             |   5  | Znalost základních příkazů                                         |
+| Git                             |  10  | Branch, commit, push s popisnou message                            |
+| **Celkem**                      | **120** |                                                                 |
