@@ -119,9 +119,7 @@ Frontend komunikuje výhradně přes `fetch()` na REST endpointy – žádné `?
 ### Přihlášení (Bearer token)
 
 ```bash
-curl -X POST https://diamondfish.cz/php-test/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"jan.novak@test.cz","password":"heslo123"}'
+curl -X POST https://diamondfish.cz/php-test/api/auth/login ...
 ```
 
 Odpověď:
@@ -224,14 +222,13 @@ GET /api/products?sort=-price         # sestupně
 BASE="https://diamondfish.cz/php-test/api"
 
 # Produkty kategorie electronics
-curl "$BASE/products?q=%7B%22category%22%3A%22electronics%22%7D"
+curl "$BASE/products" ...
 
 # Produkty s cenou >= 100
-curl "$BASE/products?q=%7B%22price%22%3A%7B%22value%22%3A100%2C%22operator%22%3A%22gte%22%7D%7D"
+curl "$BASE/products" ...
 
 # Uživatelé s emailem končícím @test.cz (vyžaduje auth)
-curl -H "Authorization: Bearer test-token-abc123" \
-     "$BASE/users?q=%7B%22email%22%3A%7B%22value%22%3A%22%40test.cz%22%2C%22operator%22%3A%22end%22%7D%7D"
+curl "$BASE/users" ...
 ```
 
 ---
@@ -256,17 +253,13 @@ curl -H "Authorization: Bearer test-token-abc123" \
 BASE="https://diamondfish.cz/php-test/api"
 
 # Správné přihlášení
-curl -X POST "$BASE/auth/login" \
-     -H "Content-Type: application/json" \
-     -d '{"email":"admin@test.cz","password":"Admin1234!"}'
+curl -X POST "$BASE/auth/login" ...
 
 # Špatné heslo → 401
-curl -X POST "$BASE/auth/login" \
-     -H "Content-Type: application/json" \
-     -d '{"email":"admin@test.cz","password":"spatne"}'
+curl -X POST "$BASE/auth/login" ...
 
 # Profil přihlášeného uživatele
-curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
+curl "$BASE/auth/me" ...
 ```
 
 ---
@@ -316,7 +309,7 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 **Cíl:** Odhalit a nahlásit produkty s cenou jako string s čárkou (`"19,90"`) a chybu ve formuláři.
 
 **Postup:**
-1. `curl https://diamondfish.cz/php-test/api/products/4` – `"price": "19,90"` (string!)
+1. `curl https://diamondfish.cz/php-test/api/products/4 ...` – `"price": "19,90"` (string!)
 2. V JS: `parseFloat("19,90")` vrátí `19`, ne `19.9` – otevři DevTools Console a vyzkoušej
 3. Na stránce `/pages/products.php` – cena produktu ID=4 se zobrazí jako `"19,90" Kč` (řetězec)
 4. API vrátí `422` s chybou: **"price obsahuje desetinnou čárku místo tečky"**
@@ -353,7 +346,7 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 #### Bug D: Role select ignorovaná backendem
 1. Nastav Role na **Administrátor** a odešli formulář
 2. V odpovědi uvidíš `"role": "user"` – backend vždy nastaví `user`
-3. Ověř přes cURL: `curl -X POST https://diamondfish.cz/php-test/api/users -H "Content-Type: application/json" -d '{"role":"admin","username":"x","email":"x@test.cz","password":"heslo123"}'` → response `"role":"user"`
+3. Ověř přes cURL: `curl -X POST https://diamondfish.cz/php-test/api/users ...` → response `"role":"user"`
 
 #### Bug E: Shoda hesel jen na JS, ne na backendu
 1. Zadej různá hesla – JS zobrazí chybu, formulář nejde odeslat
@@ -427,11 +420,11 @@ curl -H "Authorization: Bearer admin-token-xyz456" "$BASE/auth/me"
 **cURL ověření:**
 ```bash
 BASE="https://diamondfish.cz/php-test/api"
-curl -v "$BASE/status/500"
-curl -v "$BASE/users"
-curl -v -H "Authorization: Bearer test-token-abc123" "$BASE/users"
-curl -v -X DELETE -H "Authorization: Bearer test-token-abc123" "$BASE/products/1"
-curl -v -X DELETE -H "Authorization: Bearer admin-token-xyz456" "$BASE/products/1"
+curl "$BASE/status/500" ...
+curl "$BASE/users" ...
+curl "$BASE/users" ...
+curl -X DELETE "$BASE/products/1" ...
+curl -X DELETE "$BASE/products/1" ...
 ```
 
 **Co nahlásit:**
@@ -466,21 +459,16 @@ console.table([{id:1, price:10, type:'int'}, {id:4, price:'19,90', type:'string'
 BASE="https://diamondfish.cz/php-test/api"
 
 # Přihlášení a získání tokenu
-curl -X POST "$BASE/auth/login" \
-     -H "Content-Type: application/json" \
-     -d '{"email":"jan.novak@test.cz","password":"heslo123"}'
+curl -X POST "$BASE/auth/login" ...
 
 # Autentizovaný GET
-curl -H "Authorization: Bearer test-token-abc123" "$BASE/users"
+curl "$BASE/users" ...
 
 # POST produkt
-curl -X POST "$BASE/products" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer test-token-abc123" \
-     -d '{"name":"Nový produkt","price":29.99,"category":"other"}'
+curl -X POST "$BASE/products" ...
 
 # Verbose výstup (hlavičky, status)
-curl -v "$BASE/status/401"
+curl "$BASE/status/401" ...
 ```
 
 #### SSH
