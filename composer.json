@@ -3,7 +3,8 @@
     "description": "Testovaci prostredi pro overeni znalosti noveho testera",
     "type": "project",
     "require": {
-        "php": ">=8.1"
+        "php": ">=8.1",
+        "erusev/parsedown": "^1.8"
     },
     "config": {
         "optimize-autoloader": true
